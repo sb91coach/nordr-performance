@@ -1,0 +1,12 @@
+.env
+.env.*
+!.env.example
+.vercel
+.DS_Store
+node_modules/
+npm-debug.log*
+yarn-error.log*
+*.pem
+*.key
+.secrets/
+credentials.json

@@ -1,0 +1,12 @@
+{
+  "name": "nordr-performance",
+  "version": "1.0.0",
+  "private": true,
+  "description": "NORDR Performance static website and System Check backend",
+  "scripts": {
+    "test": "node tests/system-check-engine.test.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.115.0"
+  }
+}

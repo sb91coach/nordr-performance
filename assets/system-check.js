@@ -2,6 +2,7 @@
   'use strict';
 
   var STORAGE_KEY = 'nordrSystemCheckV1';
+  var SUBMIT_URL = '/api/system-check/submit';
 
   var DIMENSIONS = ['objective', 'system', 'human', 'evidence', 'decision', 'outcome'];
   var DIM_LABELS = {
@@ -14,6 +15,17 @@
   };
 
   var SCORE_MAP = { A: 4, B: 3, C: 2, D: 1, E: null };
+
+  var SECTORS = [
+    'Emergency Services',
+    'Defence',
+    'Aviation/Aerospace',
+    'Motorsport',
+    'High Performance Sport',
+    'Corporate/Executive',
+    'Industrial/High Risk',
+    'Other'
+  ];
 
   var QUESTIONS = [
     {
@@ -173,252 +185,26 @@
     'Not Established': 'Insufficient responses were available to form a clear picture in this area.'
   };
 
-  function gte(v, n) { return v != null && v >= n; }
-  function lte(v, n) { return v != null && v <= n; }
-  function lt(v, n) { return v != null && v < n; }
-
-  var PATTERNS = [
-    {
-      id: 'PAT-01',
-      name: 'Objective / Activity Disconnect',
-      priority: 50,
-      question: 'How clearly can existing Human Performance activity demonstrate contribution to the organisational objective?',
-      test: function (s) { return gte(scoreOf(s, 'OBJ-01'), 3) && lte(scoreOf(s, 'OBJ-02'), 2); }
-    },
-    {
-      id: 'PAT-02',
-      name: 'System Visibility / Ownership Disconnect',
-      priority: 48,
-      question: 'Where do responsibilities, handovers or decision points become less clear?',
-      test: function (s) { return gte(scoreOf(s, 'SYS-01'), 3) && lte(scoreOf(s, 'SYS-02'), 2); }
-    },
-    {
-      id: 'PAT-03',
-      name: 'Human Understanding / Human Voice Disconnect',
-      priority: 46,
-      question: 'How consistently can the experience of people operating in the system influence Human Performance decisions?',
-      test: function (s) { return gte(scoreOf(s, 'HUM-01'), 3) && lte(scoreOf(s, 'HUM-02'), 2); }
-    },
-    {
-      id: 'PAT-04',
-      name: 'Evidence / Decision Disconnect',
-      priority: 50,
-      question: 'Does useful Human Performance information consistently reach the people who need it at the point of decision?',
-      test: function (s) { return gte(scoreOf(s, 'EVD-01'), 3) && lte(scoreOf(s, 'DEC-01'), 2); }
-    },
-    {
-      id: 'PAT-05',
-      name: 'Activity / Outcome Disconnect',
-      priority: 55,
-      question: 'What evidence would be required to move from understanding what Human Performance activity occurs to understanding what it achieves?',
-      test: function (s) { return lte(scoreOf(s, 'EVD-01'), 2) && lte(scoreOf(s, 'OUT-01'), 2); }
-    },
-    {
-      id: 'PAT-06',
-      name: 'Evaluation / Learning Disconnect',
-      priority: 45,
-      question: 'How consistently does learning from previous Human Performance outcomes influence what happens next?',
-      test: function (s) { return gte(scoreOf(s, 'OUT-01'), 3) && lte(scoreOf(s, 'OUT-02'), 2); }
-    },
-    {
-      id: 'PAT-07',
-      name: 'Clear Objective / Unclear System',
-      priority: 55,
-      question: 'Is the organisation clearer about what it wants to achieve than how the Human Performance system collectively supports that objective?',
-      test: function (s, d) {
-        return gte(d.objective.index, 3.5) && lt(d.system.index, 2.75);
-      }
-    },
-    {
-      id: 'PAT-08',
-      name: 'Evidence Without Translation',
-      priority: 52,
-      question: 'Where does useful Human Performance information stop translating into action or decision?',
-      test: function (s, d) {
-        return gte(d.evidence.index, 3.0) && lt(d.decision.index, 2.75);
-      }
-    },
-    {
-      id: 'PAT-09',
-      name: 'Defined System / Limited Human Visibility',
-      priority: 47,
-      question: 'How well does the current Human Performance system reflect the experience of the people expected to use or operate within it?',
-      test: function (s, d) {
-        return gte(d.system.index, 3.0) && lt(d.human.index, 2.75);
-      }
-    },
-    {
-      id: 'PAT-10',
-      name: 'Incomplete Feedback Loop',
-      priority: 40,
-      question: 'How does the organisation determine whether a Human Performance decision produced the intended effect, and how does that learning influence what happens next?',
-      test: function (s, d) {
-        return lt(d.outcome.index, 2.75);
-      }
-    }
-  ];
-
-  var FALLBACK_QUESTIONS = [
-    'How clearly does the organisation define the outcome Human Performance activity is intended to support?',
-    'Where does the current Human Performance system become difficult to see or describe?',
-    'What would need to be true for evidence to inform decisions more consistently?',
-    'How does learning from previous outcomes currently influence what happens next?'
-  ];
-
-  var HEADLINE_QUESTION = 'How clearly can you connect your Human Performance activity to the outcomes that matter?';
-
-  function scoreOf(answers, id) {
-    var key = answers[id];
-    if (!key) return null;
-    var v = SCORE_MAP[key];
-    return v === undefined ? null : v;
-  }
-
-  function statusFromIndex(index) {
-    if (index == null) return 'Not Established';
-    if (index >= 3.5) return 'Established';
-    if (index >= 2.75) return 'Developing';
-    if (index >= 2.0) return 'Requires Exploration';
-    return 'Limited Visibility';
-  }
-
-  function computeDimensions(answers) {
-    var dims = {};
-    DIMENSIONS.forEach(function (dim) {
-      var qs = QUESTIONS.filter(function (q) { return q.dimension === dim; });
-      var values = [];
-      var unsureCount = 0;
-      qs.forEach(function (q) {
-        var v = scoreOf(answers, q.id);
-        if (v == null) unsureCount += 1;
-        else values.push(v);
-      });
-
-      var index = null;
-      var status = 'Not Established';
-      var confidence = 'Limited';
-
-      if (values.length === 0) {
-        status = 'Not Established';
-        confidence = 'Limited';
-      } else {
-        index = values.reduce(function (a, b) { return a + b; }, 0) / values.length;
-        status = statusFromIndex(index);
-        if (values.length === 2) confidence = 'High';
-        else confidence = 'Limited';
-      }
-
-      dims[dim] = {
-        id: dim,
-        label: DIM_LABELS[dim],
-        index: index,
-        status: status,
-        confidence: confidence,
-        answered: values.length,
-        unsure: unsureCount
-      };
-    });
-    return dims;
-  }
-
-  function detectPatterns(answers, dims) {
-    return PATTERNS.filter(function (p) {
-      try {
-        return !!p.test(answers, dims);
-      } catch (e) {
-        return false;
-      }
-    }).sort(function (a, b) {
-      return b.priority - a.priority || a.id.localeCompare(b.id);
-    });
-  }
-
-  function lowerVisibilityDims(dims) {
-    return DIMENSIONS
-      .map(function (id) { return dims[id]; })
-      .filter(function (d) {
-        return d.status === 'Limited Visibility' || d.status === 'Requires Exploration' || d.status === 'Not Established';
-      })
-      .sort(function (a, b) {
-        var av = a.index == null ? -1 : a.index;
-        var bv = b.index == null ? -1 : b.index;
-        return av - bv;
-      });
-  }
-
-  function limitedConfidenceDims(dims) {
-    return DIMENSIONS
-      .map(function (id) { return dims[id]; })
-      .filter(function (d) { return d.confidence === 'Limited'; });
-  }
-
-  function generatePriorityQuestions(answers, dims, patterns) {
-    var selected = [];
-    var seen = {};
-
-    function add(question, source) {
-      if (!question) return;
-      var key = question.trim().toLowerCase();
-      if (seen[key] || selected.length >= 3) return;
-      seen[key] = true;
-      selected.push({ question: question, source: source });
-    }
-
-    patterns.forEach(function (p) {
-      add(p.question, p.id);
-    });
-
-    lowerVisibilityDims(dims).forEach(function (d) {
-      add('Where would greater clarity in ' + d.label.toLowerCase() + ' most improve confidence in Human Performance decisions?', 'dim-' + d.id);
-    });
-
-    limitedConfidenceDims(dims).forEach(function (d) {
-      add('What additional evidence would strengthen understanding of the ' + d.label.toLowerCase() + ' dimension?', 'conf-' + d.id);
-    });
-
-    add(HEADLINE_QUESTION, 'headline');
-
-    FALLBACK_QUESTIONS.forEach(function (q, i) {
-      add(q, 'fallback-' + i);
-    });
-
-    return selected.slice(0, 3);
-  }
-
-  function clarityBuckets(dims) {
-    var clarity = [];
-    var explore = [];
-    DIMENSIONS.forEach(function (id) {
-      var d = dims[id];
-      if (d.status === 'Established' || d.status === 'Developing') clarity.push(d);
-      else explore.push(d);
-    });
-    return { clarity: clarity, explore: explore };
-  }
-
-  function buildSnapshot(answers, context) {
-    var dims = computeDimensions(answers);
-    var patterns = detectPatterns(answers, dims);
-    var priorities = generatePriorityQuestions(answers, dims, patterns);
-    var buckets = clarityBuckets(dims);
-    return {
-      createdAt: new Date().toISOString(),
-      dimensions: dims,
-      patterns: patterns.map(function (p) { return { id: p.id, name: p.name, question: p.question, priority: p.priority }; }),
-      priorities: priorities,
-      clarity: buckets.clarity.map(function (d) { return d.label; }),
-      explore: buckets.explore.map(function (d) { return d.label; }),
-      context: context || ''
-    };
-  }
-
   function defaultState() {
     return {
       step: 'intro',
       questionIndex: 0,
       answers: {},
       context: '',
-      snapshot: null
+      contact: {
+        first_name: '',
+        last_name: '',
+        work_email: '',
+        organisation: '',
+        role: '',
+        sector: '',
+        marketing_consent: false
+      },
+      snapshot: null,
+      submissionId: null,
+      submitted: false,
+      submitError: null,
+      submitting: false
     };
   }
 
@@ -427,7 +213,12 @@
       var raw = localStorage.getItem(STORAGE_KEY);
       if (!raw) return defaultState();
       var parsed = JSON.parse(raw);
-      return Object.assign(defaultState(), parsed);
+      var base = defaultState();
+      var state = Object.assign(base, parsed, {
+        contact: Object.assign({}, base.contact, parsed.contact || {}),
+        submitting: false
+      });
+      return state;
     } catch (e) {
       return defaultState();
     }
@@ -440,9 +231,14 @@
         questionIndex: state.questionIndex,
         answers: state.answers,
         context: state.context,
-        snapshot: state.snapshot
+        contact: state.contact,
+        snapshot: state.snapshot,
+        submissionId: state.submissionId,
+        submitted: state.submitted,
+        submitError: state.submitError,
+        submitting: !!state.submitting
       }));
-    } catch (e) { /* ignore quota */ }
+    } catch (e) { /* ignore */ }
   }
 
   function clearState() {
@@ -451,22 +247,26 @@
 
   function el(id) { return document.getElementById(id); }
 
+  function setState(patch) {
+    var state = Object.assign(loadState(), patch);
+    if (patch.contact) {
+      state.contact = Object.assign({}, loadState().contact, patch.contact);
+    }
+    saveState(state);
+    render();
+  }
+
   function render() {
     var root = el('system-check-app');
     if (!root) return;
     var state = loadState();
-
-    if (state.step === 'intro') renderIntro(root, state);
+    if (state.step === 'intro') renderIntro(root);
     else if (state.step === 'questions') renderQuestion(root, state);
     else if (state.step === 'context') renderContext(root, state);
+    else if (state.step === 'details') renderDetails(root, state);
     else if (state.step === 'results') renderResults(root, state);
-    else renderIntro(root, state);
-  }
-
-  function setState(patch) {
-    var state = Object.assign(loadState(), patch);
-    saveState(state);
-    render();
+    else if (state.step === 'submit-error') renderSubmitError(root, state);
+    else renderIntro(root);
   }
 
   function renderIntro(root) {
@@ -490,14 +290,17 @@
       '</section>';
 
     el('sc-begin').addEventListener('click', function () {
-      setState({ step: 'questions', questionIndex: 0, snapshot: null });
+      setState({ step: 'questions', questionIndex: 0, snapshot: null, submitted: false, submitError: null });
       window.scrollTo({ top: 0, behavior: 'smooth' });
     });
   }
 
   function progressMeta(state) {
-    var total = QUESTIONS.length + 1;
-    var current = state.step === 'context' ? QUESTIONS.length + 1 : Math.min(state.questionIndex + 1, QUESTIONS.length);
+    var total = QUESTIONS.length + 2;
+    var current;
+    if (state.step === 'context') current = QUESTIONS.length + 1;
+    else if (state.step === 'details' || state.step === 'submit-error') current = QUESTIONS.length + 2;
+    else current = Math.min(state.questionIndex + 1, QUESTIONS.length);
     var pct = Math.round((current / total) * 100);
     return { current: current, total: total, pct: pct };
   }
@@ -589,8 +392,8 @@
               '<span>Question ' + prog.current + ' of ' + prog.total + '</span>' +
               '<span>Context</span>' +
             '</div>' +
-            '<div class="sc-progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100" aria-label="Assessment progress">' +
-              '<div class="sc-progress-fill" style="width:100%;"></div>' +
+            '<div class="sc-progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' + prog.pct + '" aria-label="Assessment progress">' +
+              '<div class="sc-progress-fill" style="width:' + prog.pct + '%;"></div>' +
             '</div>' +
           '</div>' +
           '<div class="sc-card sc-context">' +
@@ -603,7 +406,7 @@
               '<button type="button" class="btn btn-ghost" id="sc-back">Previous</button>' +
               '<div class="btn-row">' +
                 '<button type="button" class="btn btn-ghost" id="sc-restart">Start again</button>' +
-                '<button type="button" class="btn btn-primary" id="sc-finish"><span>View System Snapshot</span></button>' +
+                '<button type="button" class="btn btn-primary" id="sc-finish"><span>Continue</span></button>' +
               '</div>' +
             '</div>' +
           '</div>' +
@@ -616,50 +419,266 @@
     });
 
     el('sc-finish').addEventListener('click', function () {
-      var context = el('sc-context-input').value;
-      var snapshot = buildSnapshot(loadState().answers, context);
-      setState({ step: 'results', context: context, snapshot: snapshot });
+      setState({ step: 'details', context: el('sc-context-input').value, submitError: null });
       window.scrollTo({ top: 0, behavior: 'smooth' });
     });
 
-    bindRestart('sc-restart', function () {
-      return el('sc-context-input').value;
+    bindRestart('sc-restart');
+  }
+
+  function renderDetails(root, state) {
+    var c = state.contact || {};
+    var prog = progressMeta(state);
+    var err = state.submitError ? '<p class="form-error" role="alert">' + escapeHtml(state.submitError) + '</p>' : '';
+    var submitting = !!state.submitting;
+
+    root.innerHTML =
+      '<section class="section no-border" style="padding-top:48px;">' +
+        '<div class="wrap sc-shell">' +
+          '<div class="sc-progress-wrap">' +
+            '<div class="sc-progress-meta">' +
+              '<span>Step ' + prog.current + ' of ' + prog.total + '</span>' +
+              '<span>Your details</span>' +
+            '</div>' +
+            '<div class="sc-progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100" aria-label="Assessment progress">' +
+              '<div class="sc-progress-fill" style="width:100%;"></div>' +
+            '</div>' +
+          '</div>' +
+          '<div class="sc-card">' +
+            '<p class="eyebrow">Before your snapshot</p>' +
+            '<h2 class="sc-q-text" style="max-width:22ch;">Your details</h2>' +
+            '<p>These details are used to provide your System Check result and to enable appropriate follow-up regarding your enquiry. Please see our <a href="/privacy/" style="color:var(--sand); text-decoration:underline;">Privacy Notice</a>.</p>' +
+            '<p class="small">Do not submit medical information, health information, or identifying employee performance information.</p>' +
+            err +
+            '<form id="sc-lead-form" class="lead-form" novalidate>' +
+              '<div class="form-grid">' +
+                field('first_name', 'First name', c.first_name, true) +
+                field('last_name', 'Last name', c.last_name, true) +
+                field('work_email', 'Work email', c.work_email, true, 'email') +
+                field('organisation', 'Organisation', c.organisation, true) +
+                field('role', 'Role', c.role || '', false) +
+                sectorField(c.sector || '') +
+              '</div>' +
+              '<label class="check-row">' +
+                '<input type="checkbox" id="marketing_consent" name="marketing_consent"' + (c.marketing_consent ? ' checked' : '') + (submitting ? ' disabled' : '') + '>' +
+                '<span>Send me occasional NORDR insights. <em>(Optional)</em></span>' +
+              '</label>' +
+              '<div class="hp-field" aria-hidden="true">' +
+                '<label for="company_website">Company website</label>' +
+                '<input type="text" id="company_website" name="company_website" tabindex="-1" autocomplete="off">' +
+              '</div>' +
+              '<div class="sc-nav" style="margin-top:28px;">' +
+                '<button type="button" class="btn btn-ghost" id="sc-back"' + (submitting ? ' disabled' : '') + '>Previous</button>' +
+                '<div class="btn-row">' +
+                  '<button type="button" class="btn btn-ghost" id="sc-restart"' + (submitting ? ' disabled' : '') + '>Start again</button>' +
+                  '<button type="submit" class="btn btn-primary" id="sc-submit"' + (submitting ? ' disabled' : '') + '><span>' + (submitting ? 'Submitting…' : 'View System Snapshot') + '</span></button>' +
+                '</div>' +
+              '</div>' +
+            '</form>' +
+          '</div>' +
+        '</div>' +
+      '</section>';
+
+    if (!submitting) {
+      el('sc-back').addEventListener('click', function () {
+        setState({
+          step: 'context',
+          contact: readContactFromForm(),
+          submitError: null
+        });
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      });
+
+      el('sc-lead-form').addEventListener('submit', function (e) {
+        e.preventDefault();
+        submitAssessment();
+      });
+
+      bindRestart('sc-restart');
+    }
+  }
+
+  function field(name, label, value, required, type) {
+    return '<div class="form-field">' +
+      '<label for="' + name + '">' + escapeHtml(label) + (required ? ' <span class="req">*</span>' : '') + '</label>' +
+      '<input type="' + (type || 'text') + '" id="' + name + '" name="' + name + '" value="' + escapeAttr(value || '') + '"' +
+        (required ? ' required' : '') + ' maxlength="160" autocomplete="on">' +
+    '</div>';
+  }
+
+  function sectorField(value) {
+    return '<div class="form-field">' +
+      '<label for="sector">Sector</label>' +
+      '<select id="sector" name="sector">' +
+        '<option value="">Select sector</option>' +
+        SECTORS.map(function (s) {
+          return '<option value="' + escapeAttr(s) + '"' + (value === s ? ' selected' : '') + '>' + escapeHtml(s) + '</option>';
+        }).join('') +
+      '</select>' +
+    '</div>';
+  }
+
+  function readContactFromForm() {
+    return {
+      first_name: (el('first_name') && el('first_name').value) || '',
+      last_name: (el('last_name') && el('last_name').value) || '',
+      work_email: (el('work_email') && el('work_email').value) || '',
+      organisation: (el('organisation') && el('organisation').value) || '',
+      role: (el('role') && el('role').value) || '',
+      sector: (el('sector') && el('sector').value) || '',
+      marketing_consent: !!(el('marketing_consent') && el('marketing_consent').checked)
+    };
+  }
+
+  function clientValidateContact(contact) {
+    if (!contact.first_name.trim()) return 'Please enter your first name.';
+    if (!contact.last_name.trim()) return 'Please enter your last name.';
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contact.work_email.trim())) return 'Please enter a valid work email.';
+    if (!contact.organisation.trim()) return 'Please enter your organisation.';
+    return null;
+  }
+
+  function submitAssessment() {
+    var state = loadState();
+    var contact = readContactFromForm();
+    var honeypot = el('company_website') ? el('company_website').value : '';
+
+    var localError = clientValidateContact(contact);
+    if (localError) {
+      setState({ contact: contact, submitError: localError, step: 'details' });
+      return;
+    }
+
+    var submitBtn = el('sc-submit');
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = '<span>Submitting…</span>';
+    }
+
+    // Persist contact and show submitting UI without clearing answers
+    var next = Object.assign(loadState(), {
+      contact: contact,
+      submitError: null,
+      submitting: true,
+      step: 'details'
+    });
+    saveState(next);
+    render();
+
+    fetch(SUBMIT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        answers: state.answers,
+        context: state.context || '',
+        contact: contact,
+        company_website: honeypot
+      })
+    }).then(function (res) {
+      return res.json().then(function (data) {
+        return { status: res.status, data: data };
+      }).catch(function () {
+        return { status: res.status, data: { ok: false, error: 'Unexpected response.' } };
+      });
+    }).then(function (result) {
+      if (!result.data || !result.data.ok || !result.data.snapshot) {
+        var msg = (result.data && result.data.error) ||
+          "We couldn't securely record your System Check just now. Your responses remain saved in this browser. Please try again.";
+        setState({
+          step: 'submit-error',
+          contact: contact,
+          submitError: msg,
+          submitting: false,
+          submitted: false
+        });
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        return;
+      }
+
+      setState({
+        step: 'results',
+        contact: contact,
+        snapshot: result.data.snapshot,
+        submissionId: result.data.submissionId || null,
+        submitted: true,
+        submitError: null,
+        submitting: false
+      });
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }).catch(function () {
+      setState({
+        step: 'submit-error',
+        contact: contact,
+        submitError: "We couldn't securely record your System Check just now. Your responses remain saved in this browser. Please try again.",
+        submitting: false,
+        submitted: false
+      });
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     });
   }
 
+  function renderSubmitError(root, state) {
+    root.innerHTML =
+      '<section class="section no-border" style="padding-top:72px;">' +
+        '<div class="wrap sc-shell">' +
+          '<div class="sc-card">' +
+            '<p class="eyebrow">Submission</p>' +
+            '<h2 class="sc-q-text" style="max-width:24ch;">Unable to record just now</h2>' +
+            '<p role="alert">' + escapeHtml(state.submitError || "We couldn't securely record your System Check just now. Your responses remain saved in this browser. Please try again.") + '</p>' +
+            '<div class="btn-row" style="margin-top:28px;">' +
+              '<button type="button" class="btn btn-primary" id="sc-retry"><span>Try again</span></button>' +
+              '<button type="button" class="btn btn-ghost" id="sc-restart">Start again</button>' +
+            '</div>' +
+          '</div>' +
+        '</div>' +
+      '</section>';
+
+    el('sc-retry').addEventListener('click', function () {
+      setState({ step: 'details', submitError: null });
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+    bindRestart('sc-restart');
+  }
+
   function renderResults(root, state) {
-    var snap = state.snapshot || buildSnapshot(state.answers, state.context);
+    var snap = state.snapshot;
+    if (!snap || !state.submitted) {
+      setState({ step: 'details', submitError: null });
+      return;
+    }
+
     var dimsHtml = DIMENSIONS.map(function (id) {
       var d = snap.dimensions[id];
+      var interpretation = d.interpretation || STATUS_COPY[d.status] || '';
       return '<article class="result-dim">' +
         '<h3>' + escapeHtml(d.label) + '</h3>' +
         '<div class="result-status">' + escapeHtml(d.status) + '</div>' +
-        '<p>' + escapeHtml(STATUS_COPY[d.status] || '') + '</p>' +
+        '<p>' + escapeHtml(interpretation) + '</p>' +
         '<p class="result-confidence">Confidence: ' + escapeHtml(d.confidence) + '</p>' +
       '</article>';
     }).join('');
 
-    var clarityHtml = snap.clarity.length
+    var clarityHtml = (snap.clarity && snap.clarity.length)
       ? '<ul>' + snap.clarity.map(function (l) { return '<li>' + escapeHtml(l) + '</li>'; }).join('') + '</ul>'
       : '<p>No areas currently appear relatively clear based on the responses provided.</p>';
 
-    var exploreHtml = snap.explore.length
+    var exploreHtml = (snap.explore && snap.explore.length)
       ? '<ul>' + snap.explore.map(function (l) { return '<li>' + escapeHtml(l) + '</li>'; }).join('') + '</ul>'
       : '<p>Responses did not highlight an immediate area requiring further exploration.</p>';
 
     var questionsHtml = '<ol class="priority-list">' +
-      snap.priorities.map(function (p) { return '<li>' + escapeHtml(p.question) + '</li>'; }).join('') +
+      (snap.priorities || []).map(function (p) { return '<li>' + escapeHtml(p.question) + '</li>'; }).join('') +
       '</ol>';
 
-    var contextBlock = snap.context && snap.context.trim()
-      ? '<div class="insight-block"><h3>Your context note</h3><p>' + escapeHtml(snap.context.trim()) + '</p></div>'
+    var contextBlock = snap.context && String(snap.context).trim()
+      ? '<div class="insight-block"><h3>Your context note</h3><p>' + escapeHtml(String(snap.context).trim()) + '</p></div>'
       : '';
 
     var suggestBits = [];
-    if (snap.patterns.length) {
+    if (snap.patternsDetected) {
       suggestBits.push('Detected relationship patterns point toward questions about how parts of the system connect, rather than isolated capability gaps.');
     }
-    if (snap.explore.length) {
+    if (snap.explore && snap.explore.length) {
       suggestBits.push('Lower-visibility areas may benefit from more structured enquiry before deciding what to change.');
     }
     if (!suggestBits.length) {
@@ -696,7 +715,7 @@
           '<div class="sc-panel" style="margin-top:48px;">' +
             '<h2 style="font-size:clamp(22px,3.2vw,30px);">A System Check identifies questions.<br>An audit investigates them.</h2>' +
             '<div class="btn-row no-print" style="margin-top:28px;">' +
-              '<a class="btn btn-primary" href="/contact/"><span>Discuss your results</span></a>' +
+              '<a class="btn btn-primary" href="/contact/"><span>Contact NORDR</span></a>' +
               '<button type="button" class="btn btn-outline" id="sc-print"><span>Print / Save Snapshot</span></button>' +
               '<button type="button" class="btn btn-ghost" id="sc-restart">Start again</button>' +
             '</div>' +
@@ -732,15 +751,10 @@
     return escapeHtml(str).replace(/'/g, '&#39;');
   }
 
-  // Expose for optional debugging / future tests
   window.NORDRSystemCheck = {
     QUESTIONS: QUESTIONS,
-    buildSnapshot: buildSnapshot,
-    computeDimensions: computeDimensions,
-    detectPatterns: detectPatterns,
-    generatePriorityQuestions: generatePriorityQuestions,
-    scoreOf: scoreOf,
-    SCORE_MAP: SCORE_MAP
+    SCORE_MAP: SCORE_MAP,
+    SECTORS: SECTORS
   };
 
   document.addEventListener('DOMContentLoaded', render);
