@@ -1,6 +1,5 @@
 'use strict';
 
-const { createClient } = require('@supabase/supabase-js');
 const engine = require('../../lib/system-check-engine');
 
 const MAX_BODY_BYTES = 48 * 1024;
@@ -166,26 +165,39 @@ module.exports = async function handler(req, res) {
   const storage = engine.buildStoragePayload(contact, answers, context, snapshot);
 
   try {
-    const supabase = createClient(supabaseUrl, serviceKey, {
-      auth: { persistSession: false, autoRefreshToken: false }
-    });
+    const base = supabaseUrl.replace(/\/$/, '');
+    const headers = {
+      'Content-Type': 'application/json',
+      apikey: serviceKey,
+      Authorization: 'Bearer ' + serviceKey
+    };
 
-    let data = null;
-    let error = null;
-
-    ({ data, error } = await supabase.rpc('create_system_check_submission', { payload: storage }));
-
-    // Compatibility if older schema alias is the only available function
-    if (error && (error.code === 'PGRST202' || /Could not find the function/i.test(error.message || ''))) {
-      ({ data, error } = await supabase.rpc('submit_system_check', { payload: storage }));
+    async function callRpc(fnName) {
+      const response = await fetch(base + '/rest/v1/rpc/' + fnName, {
+        method: 'POST',
+        headers: headers,
+        body: JSON.stringify({ payload: storage })
+      });
+      const text = await response.text();
+      return { response: response, text: text };
     }
 
-    if (error) {
+    let result = await callRpc('create_system_check_submission');
+    if (!result.response.ok && /Could not find the function|PGRST202|does not exist/i.test(result.text || '')) {
+      result = await callRpc('submit_system_check');
+    }
+
+    let data = null;
+    try {
+      data = result.text ? JSON.parse(result.text) : null;
+    } catch (e) {
+      data = null;
+    }
+
+    if (!result.response.ok) {
       console.error('system_check_submission rpc failed', {
-        code: error.code || 'unknown',
-        message: error.message || 'none',
-        details: error.details || 'none',
-        hint: error.hint || 'none'
+        status: result.response.status,
+        body: typeof result.text === 'string' ? result.text.slice(0, 400) : 'none'
       });
       json(res, 502, {
         ok: false,
@@ -195,10 +207,11 @@ module.exports = async function handler(req, res) {
     }
 
     const participant = engine.participantView(snapshot);
+    const submissionId = data && data.submission_id ? data.submission_id : null;
 
     json(res, 200, {
       ok: true,
-      submissionId: data && data.submission_id ? data.submission_id : null,
+      submissionId: submissionId,
       snapshot: participant
     });
   } catch (err) {
