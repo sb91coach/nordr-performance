@@ -57,6 +57,18 @@ function setCors(res, origin) {
 }
 
 function readJsonBody(req) {
+  // Vercel may already parse JSON into req.body
+  if (req.body != null && typeof req.body === 'object' && !Buffer.isBuffer(req.body)) {
+    return Promise.resolve(req.body);
+  }
+  if (typeof req.body === 'string' && req.body.length) {
+    try {
+      return Promise.resolve(JSON.parse(req.body));
+    } catch (e) {
+      return Promise.reject(Object.assign(new Error('Malformed JSON'), { statusCode: 400 }));
+    }
+  }
+
   return new Promise((resolve, reject) => {
     let size = 0;
     const chunks = [];
@@ -158,10 +170,23 @@ module.exports = async function handler(req, res) {
       auth: { persistSession: false, autoRefreshToken: false }
     });
 
-    const { data, error } = await supabase.rpc('create_system_check_submission', { payload: storage });
+    let data = null;
+    let error = null;
+
+    ({ data, error } = await supabase.rpc('create_system_check_submission', { payload: storage }));
+
+    // Compatibility if older schema alias is the only available function
+    if (error && (error.code === 'PGRST202' || /Could not find the function/i.test(error.message || ''))) {
+      ({ data, error } = await supabase.rpc('submit_system_check', { payload: storage }));
+    }
 
     if (error) {
-      console.error('create_system_check_submission failed', error.code || 'unknown');
+      console.error('system_check_submission rpc failed', {
+        code: error.code || 'unknown',
+        message: error.message || 'none',
+        details: error.details || 'none',
+        hint: error.hint || 'none'
+      });
       json(res, 502, {
         ok: false,
         error: "We couldn't securely record your System Check just now. Your responses remain saved in this browser. Please try again."
@@ -170,11 +195,6 @@ module.exports = async function handler(req, res) {
     }
 
     const participant = engine.participantView(snapshot);
-    // Structured for a future NORDR admin / discovery brief view — never returned to the browser
-    void engine.buildDiscoveryBrief(contact, snapshot, {
-      answers,
-      created_at: snapshot.createdAt
-    });
 
     json(res, 200, {
       ok: true,
@@ -182,7 +202,7 @@ module.exports = async function handler(req, res) {
       snapshot: participant
     });
   } catch (err) {
-    console.error('Unexpected submission error');
+    console.error('Unexpected submission error', err && err.message ? err.message : 'unknown');
     json(res, 500, {
       ok: false,
       error: "We couldn't securely record your System Check just now. Your responses remain saved in this browser. Please try again."
