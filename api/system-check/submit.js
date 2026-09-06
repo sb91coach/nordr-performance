@@ -248,6 +248,9 @@ module.exports = async function handler(req, res) {
       });
       json(res, 502, {
         ok: false,
+        code: 'RPC_FAILED',
+        detail: typeof result.text === 'string' ? result.text.slice(0, 180) : 'none',
+        status: result.status,
         error: "We couldn't securely record your System Check just now. Your responses remain saved in this browser. Please try again."
       });
       return;
@@ -265,6 +268,8 @@ module.exports = async function handler(req, res) {
     console.error('Unexpected submission error', err && err.message ? err.message : 'unknown');
     json(res, 500, {
       ok: false,
+      code: 'UNEXPECTED',
+      detail: err && err.message ? String(err.message).slice(0, 120) : 'unknown',
       error: "We couldn't securely record your System Check just now. Your responses remain saved in this browser. Please try again."
     });
   }
