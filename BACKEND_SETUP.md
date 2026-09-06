@@ -53,12 +53,15 @@ You will **not** put the database password into the website code.
 3. Click **New query**
 4. Open this file from the NORDR repository:
 
-   `supabase/migrations/001_system_check_schema.sql`
+   `supabase/migrations/002_create_nordr_system_check.sql`
+
+   If this is a brand-new Supabase project and you have never run any NORDR SQL, you can run `001_system_check_schema.sql` first, then `002`, or run `002` alone (it creates tables with `IF NOT EXISTS`).
 
 5. Copy the entire contents of that file
 6. Paste it into the Supabase SQL editor
 7. Click **Run**
 8. Confirm it completed without errors
+9. Optional: run `supabase/test/verify_schema.sql` to confirm tables, RLS, indexes and functions
 
 ### What this creates
 
@@ -74,9 +77,15 @@ Also:
 
 - Useful indexes
 - Row Level Security enabled
-- An atomic function: `submit_system_check(payload jsonb)`
+- An atomic function: `create_system_check_submission(payload jsonb)`
+  (compatibility alias: `submit_system_check`)
 
-That function stores the contact + submission + responses + patterns + priority questions together in one transaction.
+Apply migrations in order:
+
+1. `supabase/migrations/001_system_check_schema.sql` (if not already applied)
+2. `supabase/migrations/002_create_nordr_system_check.sql` (constraints, updated_at, canonical function)
+
+If you already ran migration 001, you only need to run **002**.
 
 ---
 

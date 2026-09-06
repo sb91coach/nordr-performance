@@ -158,10 +158,10 @@ module.exports = async function handler(req, res) {
       auth: { persistSession: false, autoRefreshToken: false }
     });
 
-    const { data, error } = await supabase.rpc('submit_system_check', { payload: storage });
+    const { data, error } = await supabase.rpc('create_system_check_submission', { payload: storage });
 
     if (error) {
-      console.error('submit_system_check failed', error.code || 'unknown');
+      console.error('create_system_check_submission failed', error.code || 'unknown');
       json(res, 502, {
         ok: false,
         error: "We couldn't securely record your System Check just now. Your responses remain saved in this browser. Please try again."
