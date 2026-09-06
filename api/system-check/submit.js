@@ -174,7 +174,8 @@ module.exports = async function handler(req, res) {
 
   let supabaseBase;
   try {
-    supabaseBase = new URL(String(supabaseUrl).trim()).origin;
+    const cleanedUrl = String(supabaseUrl).trim().replace(/^["']+|["']+$/g, '');
+    supabaseBase = new URL(cleanedUrl).origin;
   } catch (e) {
     console.error('Invalid SUPABASE_URL format');
     json(res, 503, {
@@ -184,7 +185,7 @@ module.exports = async function handler(req, res) {
     return;
   }
 
-  const trimmedKey = String(serviceKey).trim();
+  const trimmedKey = String(serviceKey).trim().replace(/^["']+|["']+$/g, '');
   if (!trimmedKey) {
     console.error('Empty SUPABASE_SERVICE_ROLE_KEY');
     json(res, 503, {
