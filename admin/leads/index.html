@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Leads | NORDR Admin</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" type="image/png" href="/assets/favicon.png">
+<link rel="stylesheet" href="/assets/admin.css">
+</head>
+<body>
+<div class="admin-shell">
+  <header class="admin-top">
+    <div class="admin-top-inner">
+      <a class="admin-brand" href="/admin">
+        <img src="/assets/logo.png" alt="">
+        <span>NORDR Admin</span>
+      </a>
+      <nav class="admin-nav" aria-label="Admin">
+        <a href="/admin">Overview</a>
+        <a href="/admin/leads" aria-current="page">Leads</a>
+        <button type="button" class="logout" id="logout-btn">Log out</button>
+      </nav>
+    </div>
+  </header>
+
+  <main class="admin-main">
+    <div id="admin-error" class="loading">Loading…</div>
+    <div id="admin-content" hidden>
+      <p class="admin-kicker">Consultancy pipeline</p>
+      <h1 class="admin-title">Leads</h1>
+      <p class="admin-lede">All System Check submissions. Click a row to open the discovery brief.</p>
+      <hr class="rule">
+
+      <div class="toolbar">
+        <div class="field">
+          <label for="filter-q">Search</label>
+          <input id="filter-q" type="search" placeholder="Name, email, organisation">
+        </div>
+        <div class="field narrow">
+          <label for="filter-sector">Sector</label>
+          <select id="filter-sector">
+            <option value="">All sectors</option>
+          </select>
+        </div>
+        <div class="field narrow">
+          <label for="filter-status">Status</label>
+          <select id="filter-status">
+            <option value="">All statuses</option>
+          </select>
+        </div>
+        <div class="field narrow">
+          <label for="filter-sort">Sort</label>
+          <select id="filter-sort">
+            <option value="newest">Newest</option>
+            <option value="oldest">Oldest</option>
+            <option value="organisation">Organisation</option>
+            <option value="status">Status</option>
+            <option value="follow_up">Follow-up date</option>
+          </select>
+        </div>
+      </div>
+
+      <p class="muted" id="leads-count" style="margin:0 0 12px"></p>
+
+      <section class="panel">
+        <div class="table-wrap">
+          <table class="data">
+            <thead>
+              <tr>
+                <th>Organisation</th>
+                <th>Contact</th>
+                <th>Role</th>
+                <th>Sector</th>
+                <th>Completed</th>
+                <th>Engagement Status</th>
+                <th>Next Action</th>
+                <th>Follow-up Date</th>
+              </tr>
+            </thead>
+            <tbody id="leads-body">
+              <tr><td colspan="8" class="muted">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="stack-cards" id="leads-cards"></div>
+      </section>
+    </div>
+  </main>
+</div>
+<script type="module" src="/assets/admin-leads.js"></script>
+</body>
+</html>

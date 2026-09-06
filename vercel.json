@@ -5,6 +5,32 @@
     "api/system-check/submit.js": {
       "memory": 256,
       "maxDuration": 10
+    },
+    "api/admin/config.js": {
+      "memory": 128,
+      "maxDuration": 5
     }
-  }
+  },
+  "rewrites": [
+    {
+      "source": "/admin/leads/:id",
+      "destination": "/admin/leads/detail/index.html"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/admin",
+      "headers": [
+        { "key": "X-Robots-Tag", "value": "noindex, nofollow" },
+        { "key": "Cache-Control", "value": "no-store" }
+      ]
+    },
+    {
+      "source": "/admin/(.*)",
+      "headers": [
+        { "key": "X-Robots-Tag", "value": "noindex, nofollow" },
+        { "key": "Cache-Control", "value": "no-store" }
+      ]
+    }
+  ]
 }

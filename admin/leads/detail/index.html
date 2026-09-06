@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lead detail | NORDR Admin</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" type="image/png" href="/assets/favicon.png">
+<link rel="stylesheet" href="/assets/admin.css">
+</head>
+<body>
+<div class="admin-shell">
+  <header class="admin-top">
+    <div class="admin-top-inner">
+      <a class="admin-brand" href="/admin">
+        <img src="/assets/logo.png" alt="">
+        <span>NORDR Admin</span>
+      </a>
+      <nav class="admin-nav" aria-label="Admin">
+        <a href="/admin">Overview</a>
+        <a href="/admin/leads" aria-current="page">Leads</a>
+        <button type="button" class="logout" id="logout-btn">Log out</button>
+      </nav>
+    </div>
+  </header>
+
+  <main class="admin-main">
+    <div id="admin-error" class="loading">Loading…</div>
+    <div id="admin-content" hidden>
+      <p class="admin-kicker"><a href="/admin/leads" style="color:inherit">← All leads</a></p>
+      <h1 class="admin-title" id="lead-title">Lead</h1>
+      <p class="admin-lede" id="lead-sub"></p>
+      <hr class="rule">
+
+      <section class="panel">
+        <h2>1. Contact</h2>
+        <div id="section-contact"></div>
+      </section>
+
+      <section class="panel">
+        <h2>2. Headline question</h2>
+        <div id="section-headline"></div>
+      </section>
+
+      <section class="panel">
+        <h2>3. System snapshot</h2>
+        <div id="section-snapshot"></div>
+      </section>
+
+      <section class="panel">
+        <h2>4. Full responses</h2>
+        <div id="section-responses"></div>
+      </section>
+
+      <section class="panel">
+        <h2>5. Detected patterns</h2>
+        <div id="section-patterns"></div>
+      </section>
+
+      <section class="panel">
+        <h2>6. Three priority questions</h2>
+        <div id="section-priority"></div>
+      </section>
+
+      <section class="panel">
+        <h2>7. Internal discovery brief</h2>
+        <div id="section-brief"></div>
+      </section>
+
+      <section class="panel">
+        <h2>8. Consultant workspace</h2>
+        <div id="workspace-flash" class="flash" hidden></div>
+        <form id="workspace-form">
+          <div class="grid-2">
+            <div class="field">
+              <label for="field-status">Engagement status</label>
+              <select id="field-status" required></select>
+            </div>
+            <div class="field">
+              <label for="field-source">Lead source</label>
+              <select id="field-source"></select>
+            </div>
+            <div class="field">
+              <label for="field-next">Next action</label>
+              <input id="field-next" type="text" maxlength="240" placeholder="Concise next step">
+            </div>
+            <div class="field">
+              <label for="field-followup">Follow-up date</label>
+              <input id="field-followup" type="date">
+            </div>
+          </div>
+          <div class="field" style="margin-top:14px">
+            <label for="field-notes">Internal notes</label>
+            <textarea id="field-notes" maxlength="8000" placeholder="Plain-text consultancy notes only. Do not record medical or special-category personal information."></textarea>
+          </div>
+          <div class="workspace-actions">
+            <button class="btn btn-primary" type="submit" id="save-btn">Save workspace</button>
+          </div>
+        </form>
+      </section>
+    </div>
+  </main>
+</div>
+<script type="module" src="/assets/admin-lead-detail.js"></script>
+</body>
+</html>

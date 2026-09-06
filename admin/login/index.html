@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin login | NORDR Performance</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" type="image/png" href="/assets/favicon.png">
+<link rel="stylesheet" href="/assets/admin.css">
+</head>
+<body>
+<div class="login-wrap">
+  <div class="login-card">
+    <p class="admin-kicker">NORDR Performance</p>
+    <h1>Admin access</h1>
+    <p class="admin-lede" style="margin-top:10px">Internal use only. There is no public registration.</p>
+    <div id="login-flash" class="flash" hidden></div>
+    <form id="login-form" class="fields" autocomplete="on">
+      <div class="field">
+        <label for="email">Work email</label>
+        <input id="email" name="email" type="email" required autocomplete="username">
+      </div>
+      <div class="field">
+        <label for="password">Password</label>
+        <input id="password" name="password" type="password" required autocomplete="current-password">
+      </div>
+      <button class="btn btn-primary" type="submit" id="login-btn">Sign in</button>
+    </form>
+  </div>
+</div>
+<script type="module" src="/assets/admin-login.js"></script>
+</body>
+</html>

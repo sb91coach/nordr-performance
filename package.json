@@ -7,7 +7,7 @@
     "node": "20.x"
   },
   "scripts": {
-    "test": "node tests/system-check-engine.test.js"
+    "test": "node tests/system-check-engine.test.js && node tests/admin-smoke.test.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.115.0"
