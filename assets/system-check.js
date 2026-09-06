@@ -508,8 +508,8 @@
 
   function sectorField(value) {
     return '<div class="form-field">' +
-      '<label for="sector">Sector</label>' +
-      '<select id="sector" name="sector">' +
+      '<label for="sector">Sector <span class="req">*</span></label>' +
+      '<select id="sector" name="sector" required>' +
         '<option value="">Select sector</option>' +
         SECTORS.map(function (s) {
           return '<option value="' + escapeAttr(s) + '"' + (value === s ? ' selected' : '') + '>' + escapeHtml(s) + '</option>';
@@ -535,6 +535,7 @@
     if (!contact.last_name.trim()) return 'Please enter your last name.';
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contact.work_email.trim())) return 'Please enter a valid work email.';
     if (!contact.organisation.trim()) return 'Please enter your organisation.';
+    if (!contact.sector.trim()) return 'Please select a sector.';
     return null;
   }
 
