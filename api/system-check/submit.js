@@ -1,5 +1,6 @@
 'use strict';
 
+const https = require('https');
 const engine = require('../../lib/system-check-engine');
 
 const MAX_BODY_BYTES = 48 * 1024;
@@ -8,6 +9,37 @@ const RATE_LIMIT_MAX = 12;
 
 /** @type {Map<string, number[]>} */
 const rateBuckets = new Map();
+
+function postJson(urlString, headers, objectBody) {
+  const body = JSON.stringify(objectBody);
+  const u = new URL(urlString);
+  const opts = {
+    hostname: u.hostname,
+    path: u.pathname + (u.search || ''),
+    method: 'POST',
+    headers: Object.assign({}, headers, {
+      'Content-Type': 'application/json',
+      'Content-Length': Buffer.byteLength(body)
+    })
+  };
+
+  return new Promise(function (resolve, reject) {
+    const req = https.request(opts, function (res) {
+      const chunks = [];
+      res.on('data', function (chunk) { chunks.push(chunk); });
+      res.on('end', function () {
+        resolve({
+          status: res.statusCode || 0,
+          ok: (res.statusCode || 0) >= 200 && (res.statusCode || 0) < 300,
+          text: Buffer.concat(chunks).toString('utf8')
+        });
+      });
+    });
+    req.on('error', reject);
+    req.write(body);
+    req.end();
+  });
+}
 
 function getClientIp(req) {
   const forwarded = req.headers['x-forwarded-for'];
@@ -140,6 +172,28 @@ module.exports = async function handler(req, res) {
     return;
   }
 
+  let supabaseBase;
+  try {
+    supabaseBase = new URL(String(supabaseUrl).trim()).origin;
+  } catch (e) {
+    console.error('Invalid SUPABASE_URL format');
+    json(res, 503, {
+      ok: false,
+      error: "We couldn't securely record your System Check just now. Your responses remain saved in this browser. Please try again."
+    });
+    return;
+  }
+
+  const trimmedKey = String(serviceKey).trim();
+  if (!trimmedKey) {
+    console.error('Empty SUPABASE_SERVICE_ROLE_KEY');
+    json(res, 503, {
+      ok: false,
+      error: "We couldn't securely record your System Check just now. Your responses remain saved in this browser. Please try again."
+    });
+    return;
+  }
+
   let body;
   try {
     body = await readJsonBody(req);
@@ -165,25 +219,17 @@ module.exports = async function handler(req, res) {
   const storage = engine.buildStoragePayload(contact, answers, context, snapshot);
 
   try {
-    const base = supabaseUrl.replace(/\/$/, '');
     const headers = {
-      'Content-Type': 'application/json',
-      apikey: serviceKey,
-      Authorization: 'Bearer ' + serviceKey
+      apikey: trimmedKey,
+      Authorization: 'Bearer ' + trimmedKey
     };
 
     async function callRpc(fnName) {
-      const response = await fetch(base + '/rest/v1/rpc/' + fnName, {
-        method: 'POST',
-        headers: headers,
-        body: JSON.stringify({ payload: storage })
-      });
-      const text = await response.text();
-      return { response: response, text: text };
+      return postJson(supabaseBase + '/rest/v1/rpc/' + fnName, headers, { payload: storage });
     }
 
     let result = await callRpc('create_system_check_submission');
-    if (!result.response.ok && /Could not find the function|PGRST202|does not exist/i.test(result.text || '')) {
+    if (!result.ok && /Could not find the function|PGRST202|does not exist/i.test(result.text || '')) {
       result = await callRpc('submit_system_check');
     }
 
@@ -194,9 +240,9 @@ module.exports = async function handler(req, res) {
       data = null;
     }
 
-    if (!result.response.ok) {
+    if (!result.ok) {
       console.error('system_check_submission rpc failed', {
-        status: result.response.status,
+        status: result.status,
         body: typeof result.text === 'string' ? result.text.slice(0, 400) : 'none'
       });
       json(res, 502, {
