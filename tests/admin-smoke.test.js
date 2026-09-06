@@ -28,7 +28,7 @@ const requiredFiles = [
   'admin/index.html',
   'admin/login/index.html',
   'admin/leads/index.html',
-  'admin/leads/detail/index.html',
+  'admin/lead/index.html',
   'assets/admin.css',
   'assets/admin-core.js',
   'assets/admin-home.js',
@@ -70,7 +70,7 @@ const methodology = read('assets/admin-methodology.js');
 assert(methodology.includes("E: 'Unsure'"), 'methodology includes Unsure wording');
 assert(methodology.includes("id: 'OBJ-01'"), 'methodology includes twelve questions');
 
-['admin/index.html', 'admin/login/index.html', 'admin/leads/index.html', 'admin/leads/detail/index.html'].forEach(function (rel) {
+['admin/index.html', 'admin/login/index.html', 'admin/leads/index.html', 'admin/lead/index.html'].forEach(function (rel) {
   const html = read(rel);
   assert(html.includes('noindex'), rel + ' is noindex');
   assert(!/service_role|SERVICE_ROLE|eyJ/.test(html), rel + ' has no embedded secrets');

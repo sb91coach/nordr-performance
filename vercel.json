@@ -14,7 +14,7 @@
   "rewrites": [
     {
       "source": "/admin/leads/:id",
-      "destination": "/admin/leads/detail/index.html"
+      "destination": "/admin/lead"
     }
   ],
   "headers": [
